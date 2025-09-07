@@ -1,85 +1,103 @@
 const socket = io();
-
-const authScreen = document.getElementById("authScreen");
-const gameScreen = document.getElementById("gameScreen");
-const usernameInput = document.getElementById("username");
-const passwordInput = document.getElementById("password");
-const registerBtn = document.getElementById("registerBtn");
-const loginBtn = document.getElementById("loginBtn");
-const authMessage = document.getElementById("authMessage");
-const welcomeText = document.getElementById("welcomeText");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-let snake, food, dx, dy, score;
-let username = "";
+canvas.width = 300;
+canvas.height = 300;
 
-// Auth
-registerBtn.onclick = async () => {
-  const res = await fetch("/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
-  });
-  authMessage.textContent = await res.text();
-};
+let snake = [{ x: 150, y: 150 }];
+let direction = "RIGHT";
+let food = { x: 100, y: 100 };
+let gameLoop;
 
-loginBtn.onclick = async () => {
-  const res = await fetch("/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
-  });
-  if (res.ok) {
-    const data = await res.json();
-    username = usernameInput.value;
-    authScreen.style.display = "none";
-    gameScreen.style.display = "block";
-    welcomeText.textContent = `Welcome, ${username}!`;
-    startGame();
-  } else {
-    authMessage.textContent = await res.text();
-  }
-};
+function draw() {
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-// Game
-function startGame() {
-  snake = [{ x: 200, y: 200 }];
-  food = randomFood();
-  dx = 20; dy = 0;
-  score = 0;
-  document.addEventListener("keydown", changeDirection);
-  setInterval(updateGame, 100);
+  ctx.fillStyle = "lime";
+  snake.forEach(s => ctx.fillRect(s.x, s.y, 10, 10));
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(food.x, food.y, 10, 10);
 }
 
-function updateGame() {
-  const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+function update() {
+  let head = { ...snake[0] };
+  if (direction === "UP") head.y -= 10;
+  if (direction === "DOWN") head.y += 10;
+  if (direction === "LEFT") head.x -= 10;
+  if (direction === "RIGHT") head.x += 10;
+
   snake.unshift(head);
 
   if (head.x === food.x && head.y === food.y) {
-    score++;
-    food = randomFood();
+    food = {
+      x: Math.floor(Math.random() * 30) * 10,
+      y: Math.floor(Math.random() * 30) * 10
+    };
   } else {
     snake.pop();
   }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "green";
-  snake.forEach(p => ctx.fillRect(p.x, p.y, 20, 20));
-  ctx.fillStyle = "red";
-  ctx.fillRect(food.x, food.y, 20, 20);
+  draw();
 }
 
-function changeDirection(e) {
-  if (e.key === "ArrowUp" && dy === 0) { dx = 0; dy = -20; }
-  if (e.key === "ArrowDown" && dy === 0) { dx = 0; dy = 20; }
-  if (e.key === "ArrowLeft" && dx === 0) { dx = -20; dy = 0; }
-  if (e.key === "ArrowRight" && dx === 0) { dx = 20; dy = 0; }
+function startGame() {
+  clearInterval(gameLoop);
+  snake = [{ x: 150, y: 150 }];
+  direction = "RIGHT";
+  food = { x: 100, y: 100 };
+  gameLoop = setInterval(update, 100);
 }
 
-function randomFood() {
-  return {
-    x: Math.floor(Math.random() * 20) * 20,
-    y: Math.floor(Math.random() * 20) * 20
-  };
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+  if (e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+  if (e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+  if (e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+});
+
+// --- Auth functions ---
+async function register() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  const res = await fetch("/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+  const data = await res.json();
+  alert(data.success ? "Registered!" : data.error);
+}
+
+async function login() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  const res = await fetch("/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById("auth").style.display = "none";
+    document.getElementById("menu").style.display = "block";
+  } else {
+    alert(data.error);
+  }
+}
+
+// --- Game modes ---
+function startSingle() {
+  startGame();
+}
+
+function findMatch() {
+  socket.emit("findMatch");
+  socket.on("matchFound", (opponentId) => {
+    alert("Match found! Opponent: " + opponentId);
+    startGame();
+  });
 }
