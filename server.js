@@ -1,64 +1,79 @@
 const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const fs = require("fs");
-const bcrypt = require("bcrypt");
-
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+const http = require("http").createServer(app);
+const io = require("socket.io")(http);
+const bcrypt = require("bcrypt");
+const fs = require("fs");
 
 const PORT = process.env.PORT || 10000;
-
-// Load or create users.json
-let users = {};
-const USERS_FILE = "./users.json";
-if (fs.existsSync(USERS_FILE)) {
-  users = JSON.parse(fs.readFileSync(USERS_FILE));
-}
 
 // Middleware
 app.use(express.static("public"));
 app.use(express.json());
 
-// ✅ Fallback for homepage
+// Serve index.html
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/public/index.html");
 });
 
-// Register endpoint
-app.post("/register", (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).send("Missing fields");
-  if (users[username]) return res.status(400).send("User already exists");
+// Users storage (simple JSON file)
+const USERS_FILE = "./users.json";
+if (!fs.existsSync(USERS_FILE)) {
+  fs.writeFileSync(USERS_FILE, "{}");
+}
+let users = JSON.parse(fs.readFileSync(USERS_FILE));
 
-  const hash = bcrypt.hashSync(password, 10);
-  users[username] = { password: hash, stats: { wins: 0, losses: 0 } };
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-  res.send("Account created!");
+// Auth endpoints
+app.post("/register", async (req, res) => {
+  const { username, password } = req.body;
+  if (users[username]) return res.status(400).json({ error: "User exists" });
+
+  const hashed = await bcrypt.hash(password, 10);
+  users[username] = hashed;
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users));
+  res.json({ success: true });
 });
 
-// Login endpoint
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   const { username, password } = req.body;
-  if (!users[username]) return res.status(400).send("User not found");
+  const user = users[username];
+  if (!user) return res.status(400).json({ error: "Invalid user" });
 
-  const valid = bcrypt.compareSync(password, users[username].password);
-  if (!valid) return res.status(400).send("Invalid password");
+  const match = await bcrypt.compare(password, user);
+  if (!match) return res.status(400).json({ error: "Invalid password" });
 
-  res.send("Login successful!");
+  res.json({ success: true });
 });
 
-// Socket.IO
+// Multiplayer (simple matchmaking)
+let waitingPlayer = null;
+
 io.on("connection", (socket) => {
-  console.log("A player connected:", socket.id);
+  console.log("User connected:", socket.id);
+
+  socket.on("findMatch", () => {
+    if (waitingPlayer) {
+      const opponent = waitingPlayer;
+      waitingPlayer = null;
+      socket.emit("matchFound", opponent.id);
+      opponent.emit("matchFound", socket.id);
+    } else {
+      waitingPlayer = socket;
+    }
+  });
+
+  socket.on("move", (data) => {
+    socket.broadcast.emit("opponentMove", data);
+  });
 
   socket.on("disconnect", () => {
-    console.log("A player disconnected:", socket.id);
+    if (waitingPlayer && waitingPlayer.id === socket.id) {
+      waitingPlayer = null;
+    }
+    console.log("User disconnected:", socket.id);
   });
 });
 
-// Start server
-server.listen(PORT, () => {
+http.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
