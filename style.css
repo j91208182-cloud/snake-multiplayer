@@ -1,1 +1,15 @@
-<style.css content from above>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background: #f2f2f2;
+}
+
+#authScreen, #gameScreen {
+  margin-top: 50px;
+}
+
+canvas {
+  border: 2px solid black;
+  margin: 20px auto;
+  display: block;
+}
