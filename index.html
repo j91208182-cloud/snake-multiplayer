@@ -1,1 +1,38 @@
-<index.html content from above>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Multiplayer with Accounts</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login/Register -->
+  <div id="authScreen">
+    <h2>Snake Game Login</h2>
+    <input id="username" type="text" placeholder="Username"><br>
+    <input id="password" type="password" placeholder="Password"><br>
+    <button id="registerBtn">Register</button>
+    <button id="loginBtn">Login</button>
+    <p id="authMessage"></p>
+  </div>
+
+  <!-- Game -->
+  <div id="gameScreen" style="display:none;">
+    <h2 id="welcomeText"></h2>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <p id="statusText">Choose a mode to start</p>
+
+    <div id="controls">
+      <button id="soloBtn">Play Solo</button>
+      <button id="quickMatchBtn">Quick Match</button>
+      <button id="createRoomBtn">Create Room</button>
+      <input id="roomCodeInput" placeholder="Enter Room Code">
+      <button id="joinRoomBtn">Join Room</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
