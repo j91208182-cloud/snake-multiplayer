@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
@@ -22,39 +21,16 @@ if (fs.existsSync(USERS_FILE)) {
 app.use(express.static("public"));
 app.use(express.json());
 
-// Register endpoint
+// ✅ Fallback to index.html so "/" works
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
+
+// Register
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
   if (users[username]) return res.status(400).send("User already exists");
 
   const hash = bcrypt.hashSync(password, 10);
-  users[username] = { password: hash, stats: { wins: 0, losses: 0 } };
+  users[username] = { password: hash, stats: { wins:
 
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-  res.send("Registered successfully");
-});
-
-// Login endpoint
-app.post("/login", (req, res) => {
-  const { username, password } = req.body;
-  const user = users[username];
-  if (!user) return res.status(400).send("User not found");
-
-  const valid = bcrypt.compareSync(password, user.password);
-  if (!valid) return res.status(400).send("Invalid password");
-
-  res.json({ message: "Login successful", stats: user.stats });
-});
-
-// WebSockets
-io.on("connection", (socket) => {
-  console.log("New client connected");
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-  });
-});
-
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
